@@ -89,7 +89,7 @@ cd /workspace
 git clone --branch kirkstone git://git.yoctoproject.org/poky
 git clone --branch kirkstone https://github.com/openembedded/meta-openembedded.git
 git clone --branch kirkstone https://git.yoctoproject.org/meta-arm
-git clone --branch kirkstone https://git.ti.com/git/ti-linux-kernel/meta-ti.git
+git clone --branch kirkstone https://git.yoctoproject.org/meta-ti.git
 ```
 
 ---
