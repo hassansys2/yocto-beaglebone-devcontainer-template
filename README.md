@@ -124,6 +124,7 @@ Set:
 MACHINE = "am335x-evm"
 DL_DIR ?= "/downloads"
 SSTATE_DIR ?= "/sstate"
+TMPDIR = "/tmp/yocto/tmp-bbb-kirkstone"
 ```
 
 ---
