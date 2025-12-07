@@ -80,7 +80,7 @@ mkdir -p ~/yocto-shared/sstate
 mkdir -p ~/yocto-shared/downloads
 ```
 
-**Note:** The `.env` file is already configured to use these directories. If you prefer per-instance caches, see [Section 8.1](#81-using-per-instance-caches-optional) for instructions.
+**Note:** The `.env` file is already configured to use these directories. If you prefer per-instance caches, see [Section 9.1.1](#911-using-per-instance-caches-optional) for instructions.
 
 ---
 
@@ -145,7 +145,13 @@ MACHINE = "am335x-evm"
 DL_DIR ?= "/downloads"
 SSTATE_DIR ?= "/sstate"
 TMPDIR = "/tmp/yocto/tmp-bbb-kirkstone"
+
+# Optional: Tune build parallelism based on your Mac's CPU cores and RAM
+# BB_NUMBER_THREADS ?= "4"
+# PARALLEL_MAKE ?= "-j4"
 ```
+
+**Note:** Uncomment and adjust `BB_NUMBER_THREADS` and `PARALLEL_MAKE` based on your Mac's CPU cores and available RAM. A good starting point is half your CPU cores (e.g., 4 for an 8-core Mac).
 
 ---
 
@@ -161,6 +167,25 @@ bitbake-layers add-layer /workspace/meta-ti/meta-ti-bsp
 bitbake-layers add-layer /workspace/meta-ti/meta-ti-extras
 ```
 
+**Verify layers are added correctly:**
+
+Check `conf/bblayers.conf` — it should look like:
+
+```conf
+BBLAYERS ?= " \
+  /workspace/poky/meta \
+  /workspace/poky/meta-poky \
+  /workspace/poky/meta-yocto-bsp \
+  /workspace/meta-openembedded/meta-oe \
+  /workspace/meta-openembedded/meta-python \
+  /workspace/meta-openembedded/meta-networking \
+  /workspace/meta-arm/meta-arm-toolchain \
+  /workspace/meta-arm/meta-arm \
+  /workspace/meta-ti/meta-ti-bsp \
+  /workspace/meta-ti/meta-ti-extras \
+"
+```
+
 ---
 
 ## **Step 8 — Build Yocto Image**
@@ -171,13 +196,20 @@ bitbake core-image-minimal
 
 After build:
 
-Images appear at:
+**Image Output Location:**
 
-```
-build-bbb-kirkstone/deploy-ti/images/am335x-evm/
+Depending on meta-ti / SDK configuration, images may appear under either:
+
+- `build-bbb-kirkstone/tmp/deploy/images/am335x-evm/`, or  
+- `build-bbb-kirkstone/deploy-ti/images/am335x-evm/`
+
+To locate the deploy directory:
+
+```bash
+find build-bbb-kirkstone -maxdepth 4 -type d -name "images" -print
 ```
 
-Important output files:
+**Important output files:**
 
 | File | Purpose |
 |------|---------|
@@ -252,7 +284,62 @@ do_fetch → do_unpack → do_patch → do_configure → do_compile → do_insta
 
 ---
 
-# 🧩 5. Adding Your Custom Layer (meta-hassan)
+# 🔧 5. Changing MACHINE / DISTRO
+
+## **Changing MACHINE**
+
+To build for a different TI board or AM335x variant, edit `conf/local.conf`:
+
+```conf
+MACHINE = "am335x-evm"  # Change to your target machine
+```
+
+**Supported AM335x machines in meta-ti:**
+- `am335x-evm` — BeagleBone Black (default)
+- `am335x-evm-reva` — BeagleBone Black Rev A
+- Other AM335x variants as supported by meta-ti
+
+**Find available machines:**
+
+```bash
+# List all machines in meta-ti
+ls /workspace/meta-ti/meta-ti-bsp/conf/machine/
+
+# Or search for AM335x machines
+find /workspace/meta-ti -name "*.conf" -path "*/machine/*" | grep -i am335x
+```
+
+**Note:** The `am335x-evm` machine configuration also covers BeagleBone Black. See [TI's Yocto/Processor SDK documentation](https://software-dl.ti.com/processor-sdk-linux/esd/docs/latest/linux/Overview_Building_the_SDK.html) for other supported machines.
+
+---
+
+## **Changing DISTRO**
+
+By default, this setup uses Poky's `poky` distribution. To use TI's Processor SDK / Arago-style distribution:
+
+1. **Add meta-arago layer** (if not already present):
+
+```bash
+bitbake-layers add-layer /workspace/meta-ti/meta-arago
+```
+
+2. **Set DISTRO in `conf/local.conf`:**
+
+```conf
+DISTRO = "arago"  # or "arago-tiny", "arago-base", etc.
+```
+
+3. **Check available distributions:**
+
+```bash
+ls /workspace/meta-ti/meta-arago/conf/distro/ 2>/dev/null || echo "meta-arago not found"
+```
+
+**Note:** Different DISTROs may require different layer combinations. Refer to TI's Processor SDK documentation for specific requirements.
+
+---
+
+# 🧩 6. Adding Your Custom Layer (meta-hassan)
 
 ```bash
 cd /workspace
@@ -268,7 +355,7 @@ meta-hassan/recipes-apps/myapp/myapp.bb
 
 ---
 
-# 📄 6. Included Devcontainer Files
+# 📄 7. Included Devcontainer Files
 
 ### **devcontainer.json**
 
@@ -380,7 +467,7 @@ WORKDIR /workspace
 
 ---
 
-# 🩵 7. Troubleshooting
+# 🩵 8. Troubleshooting
 
 ### **Build too slow?**
 Use global mirrors:
@@ -402,13 +489,62 @@ caffeinate -dims &
 
 ---
 
-# 🔄 8. Running Multiple Instances
+### **Disk Space & Cleanup**
+
+Yocto builds are disk-intensive. Make sure **Docker Desktop's disk image** has at least 80–120 GB available.
+
+**Free space inside a project:**
+
+```bash
+# From inside the container
+cd /workspace/build-bbb-kirkstone
+
+# Clean sstate cache for a specific recipe
+bitbake -c cleansstate core-image-minimal
+
+# Remove temporary build files (WARNING: forces full rebuild)
+rm -rf tmp
+
+# Clean all sstate cache
+bitbake -c cleansstate -a
+```
+
+**Free space on host (Docker cleanup):**
+
+```bash
+# Remove unused Docker images, containers, and volumes
+docker system prune -af
+
+# Remove unused volumes only
+docker volume prune -f
+```
+
+**Monitor disk space:**
+
+```bash
+# Inside container
+df -h /tmp/yocto/tmp-bbb-kirkstone
+
+# On host
+docker system df
+```
+
+**Common error:** If you see:
+```
+ERROR: No new tasks can be executed since the disk space monitor action is "STOPTASKS"!
+```
+
+This means Docker's disk image or the container's `/tmp` is full. Free up space using the commands above.
+
+---
+
+# 🔄 9. Running Multiple Instances
 
 This repository is **pre-configured for multiple instances** with shared cache directories. All instances automatically share downloads and sstate cache, saving disk space and speeding up builds.
 
 ---
 
-## **8.1 Shared Caches (Default Configuration)**
+## **9.1 Shared Caches (Default Configuration)**
 
 **Shared caches are enabled by default** via the included `.env` file:
 
@@ -447,7 +583,7 @@ Both projects will share the same cache, but have separate build workspaces.
 
 ---
 
-## **8.1.1 Using Per-Instance Caches (Optional)**
+## **9.1.1 Using Per-Instance Caches (Optional)**
 
 If you need **isolated caches** per instance (e.g., different Yocto versions, testing cache behavior), you can disable shared caches:
 
@@ -473,7 +609,7 @@ The instance will use local per-instance caches.
 
 ---
 
-## **8.2 Resource Limits**
+## **9.2 Resource Limits**
 
 When running multiple instances simultaneously, limit resource usage to prevent system overload.
 
@@ -498,7 +634,7 @@ deploy:
 
 ---
 
-## **8.3 Best Practices**
+## **9.3 Best Practices**
 
 ### **✅ Do:**
 - **Use shared caches** (default) — all instances automatically share caches
@@ -515,7 +651,7 @@ deploy:
 
 ---
 
-## **8.4 Example: Two Instances**
+## **9.4 Example: Two Instances**
 
 **Instance 1** (Project A):
 ```bash
@@ -541,7 +677,7 @@ git clone https://github.com/hassansys2/yocto-beaglebone-devcontainer-template.g
 
 ---
 
-## **8.5 Resource Usage Estimate**
+## **9.5 Resource Usage Estimate**
 
 | Scenario | Instances | Total RAM | Total Disk | Build Time |
 |----------|-----------|-----------|------------|------------|
@@ -556,13 +692,16 @@ git clone https://github.com/hassansys2/yocto-beaglebone-devcontainer-template.g
 
 ---
 
-# 🎉 9. You're Ready!
+# 🎉 10. You're Ready!
 
 You now have a **full Yocto build environment** on macOS using Docker.
 
 ---
 
 # 📜 License  
-MIT — free for learning & commercial usage.
+
+This project is licensed under the MIT License — free for learning & commercial usage.
+
+See [LICENSE](LICENSE) file for details.
 
 ---
