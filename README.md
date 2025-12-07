@@ -10,6 +10,7 @@ This repository contains:
 
 - A **VSCode devcontainer** that sets up a full Yocto build environment  
 - Docker-based **reproducible development environment**  
+- **Shared cache directories by default** — multiple instances share downloads and sstate cache  
 - Preconfigured **DL_DIR** and **SSTATE_DIR** mounts for caching  
 - Instructions to build **core-image-minimal** for BeagleBone Black  
 
@@ -22,6 +23,7 @@ This repository contains:
 ✔ Safe, self-contained build environment  
 ✔ Supports **meta-ti** for AM335x (BBB)  
 ✔ Rebuilds are extremely fast using **sstate + download cache**  
+✔ **Shared caches enabled by default** — multiple instances share downloads and sstate cache  
 ✔ Clean and reproducible builds  
 
 ---
@@ -32,12 +34,13 @@ This repository contains:
 .
 ├── .devcontainer/
 │   └── devcontainer.json
+├── .env                    ← Pre-configured for shared caches
 ├── docker-compose.yml
 ├── Dockerfile
 ├── workspace/
 │   └── (Yocto source + builds will appear here)
-├── sstate/
-├── downloads/
+├── sstate/                 ← Local cache (fallback)
+├── downloads/              ← Local cache (fallback)
 └── README.md   ← you are here
 ```
 
@@ -66,7 +69,22 @@ cd yocto-beaglebone-devcontainer-template
 
 ---
 
-## **Step 2 — Launch Devcontainer**
+## **Step 2 — Create Shared Cache Directories (One-time setup)**
+
+This repository is configured to use **shared cache directories** by default (via `.env` file). This allows multiple instances to share downloads and sstate cache, saving disk space and speeding up builds.
+
+Create the shared cache directories:
+
+```bash
+mkdir -p ~/yocto-shared/sstate
+mkdir -p ~/yocto-shared/downloads
+```
+
+**Note:** The `.env` file is already configured to use these directories. If you prefer per-instance caches, see [Section 8.1](#81-using-per-instance-caches-optional) for instructions.
+
+---
+
+## **Step 3 — Launch Devcontainer**
 
 Open folder in VSCode →  
 **Command Palette → "Dev Containers: Reopen in Container"**
@@ -75,12 +93,14 @@ VSCode will:
 
 - Build Docker image  
 - Launch devcontainer  
-- Mount workspace + caches  
+- Mount workspace + **shared caches** (from `~/yocto-shared/`)  
 - Configure Yocto environment  
+
+The `.env` file is automatically loaded by Docker Compose, so shared caches are used by default.
 
 ---
 
-## **Step 3 — Download Yocto (Kirkstone)**
+## **Step 4 — Download Yocto (Kirkstone)**
 
 Inside container:
 
@@ -94,7 +114,7 @@ git clone --branch kirkstone https://git.yoctoproject.org/meta-ti.git
 
 ---
 
-## **Step 4 — Create Yocto Build Directory**
+## **Step 5 — Create Yocto Build Directory**
 
 ```bash
 source poky/oe-init-build-env build-bbb-kirkstone
@@ -110,7 +130,7 @@ build-bbb-kirkstone/
 
 ---
 
-## **Step 5 — Configure MACHINE**
+## **Step 6 — Configure MACHINE**
 
 Edit:
 
@@ -129,7 +149,7 @@ TMPDIR = "/tmp/yocto/tmp-bbb-kirkstone"
 
 ---
 
-## **Step 6 — Add Required Layers**
+## **Step 7 — Add Required Layers**
 
 ```bash
 bitbake-layers add-layer /workspace/meta-openembedded/meta-oe
@@ -143,7 +163,7 @@ bitbake-layers add-layer /workspace/meta-ti/meta-ti-extras
 
 ---
 
-## **Step 7 — Build Yocto Image**
+## **Step 8 — Build Yocto Image**
 
 ```bash
 bitbake core-image-minimal
@@ -288,8 +308,6 @@ meta-hassan/recipes-apps/myapp/myapp.bb
 ### **docker-compose.yml**
 
 ```yaml
-version: "3.8"
-
 services:
   yocto:
     build:
@@ -307,8 +325,20 @@ services:
       - SSTATE_DIR=/sstate
     volumes:
       - ./workspace:/workspace
-      - ./sstate:/sstate
-      - ./downloads:/downloads
+      # Cache directories: Shared caches are enabled by default via .env file
+      # Falls back to local ./sstate and ./downloads if env vars are not set
+      - ${YOCTO_SHARED_SSTATE_DIR:-./sstate}:/sstate
+      - ${YOCTO_SHARED_DOWNLOADS_DIR:-./downloads}:/downloads
+    # Resource limits: Uncomment and adjust values to limit resource usage
+    # Useful when running multiple instances simultaneously
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4'
+    #       memory: 8G
+    #     reservations:
+    #       cpus: '2'
+    #       memory: 4G
     command: bash -lc "bash"
 ```
 
@@ -372,7 +402,161 @@ caffeinate -dims &
 
 ---
 
-# 🎉 8. You're Ready!
+# 🔄 8. Running Multiple Instances
+
+This repository is **pre-configured for multiple instances** with shared cache directories. All instances automatically share downloads and sstate cache, saving disk space and speeding up builds.
+
+---
+
+## **8.1 Shared Caches (Default Configuration)**
+
+**Shared caches are enabled by default** via the included `.env` file:
+
+```bash
+YOCTO_SHARED_SSTATE_DIR=~/yocto-shared/sstate
+YOCTO_SHARED_DOWNLOADS_DIR=~/yocto-shared/downloads
+```
+
+### **Benefits:**
+- ✅ **Save disk space** — downloads are shared across all instances
+- ✅ **Faster builds** — sstate cache is shared (rebuilds are much faster)
+- ✅ **Reduce bandwidth** — downloads happen once, reused by all instances
+- ✅ **No configuration needed** — works out of the box
+
+### **How It Works:**
+1. Each instance clones this repository (with `.env` file)
+2. All instances point to the same shared cache directories (`~/yocto-shared/`)
+3. First build downloads everything, subsequent builds reuse cache
+4. Each instance maintains its own `workspace/` directory (builds are isolated)
+
+### **Example: Multiple Projects**
+
+```bash
+# Project A
+cd ~/projects/yocto-bbb-project-a
+git clone https://github.com/hassansys2/yocto-beaglebone-devcontainer-template.git .
+# .env file is already included - shared caches work automatically!
+
+# Project B  
+cd ~/projects/yocto-bbb-project-b
+git clone https://github.com/hassansys2/yocto-beaglebone-devcontainer-template.git .
+# Also uses shared caches automatically!
+```
+
+Both projects will share the same cache, but have separate build workspaces.
+
+---
+
+## **8.1.1 Using Per-Instance Caches (Optional)**
+
+If you need **isolated caches** per instance (e.g., different Yocto versions, testing cache behavior), you can disable shared caches:
+
+### **Option 1: Remove or rename .env file**
+
+```bash
+# Rename .env to disable shared caches
+mv .env .env.disabled
+```
+
+The instance will fall back to local `./sstate` and `./downloads` directories.
+
+### **Option 2: Modify .env file**
+
+Edit `.env` and comment out or remove the shared cache variables:
+
+```bash
+# YOCTO_SHARED_SSTATE_DIR=~/yocto-shared/sstate
+# YOCTO_SHARED_DOWNLOADS_DIR=~/yocto-shared/downloads
+```
+
+The instance will use local per-instance caches.
+
+---
+
+## **8.2 Resource Limits**
+
+When running multiple instances simultaneously, limit resource usage to prevent system overload.
+
+### **Enable Resource Limits**
+
+Edit `docker-compose.yml` and uncomment the `deploy.resources` section:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '4'      # Limit to 4 CPU cores
+      memory: 8G     # Limit to 8GB RAM
+    reservations:
+      cpus: '2'      # Reserve 2 CPU cores
+      memory: 4G     # Reserve 4GB RAM
+```
+
+**Recommended limits per instance:**
+- **CPU**: 2-4 cores (adjust based on total CPU cores)
+- **Memory**: 6-8GB (Yocto builds are memory-intensive)
+
+---
+
+## **8.3 Best Practices**
+
+### **✅ Do:**
+- **Use shared caches** (default) — all instances automatically share caches
+- Set resource limits when running 2+ instances simultaneously
+- Monitor disk space (shared cache + each build workspace needs 50-120GB)
+- Use different `workspace/` directories per instance (already isolated)
+- Create shared cache directories once (Step 2 in setup)
+
+### **❌ Don't:**
+- Run more than 2-3 instances simultaneously (unless you have 32+ GB RAM)
+- Share caches between different Yocto versions (e.g., Kirkstone vs. Dunfell) — use per-instance caches for different versions
+- Share `workspace/` directories (builds must be isolated)
+- Delete `.env` file unless you need per-instance caches
+
+---
+
+## **8.4 Example: Two Instances**
+
+**Instance 1** (Project A):
+```bash
+cd ~/projects/yocto-bbb-project-a
+git clone https://github.com/hassansys2/yocto-beaglebone-devcontainer-template.git .
+# .env file is included - shared caches configured automatically!
+# Open in VSCode → Reopen in Container
+```
+
+**Instance 2** (Project B):
+```bash
+cd ~/projects/yocto-bbb-project-b
+git clone https://github.com/hassansys2/yocto-beaglebone-devcontainer-template.git .
+# .env file is included - shared caches configured automatically!
+# Open in VSCode → Reopen in Container
+```
+
+**No additional configuration needed!** Both instances will:
+- ✅ Share sstate cache (faster rebuilds)
+- ✅ Share downloads (saves disk/bandwidth)
+- ✅ Use separate workspaces (no build conflicts)
+- ✅ Work out of the box (`.env` file handles everything)
+
+---
+
+## **8.5 Resource Usage Estimate**
+
+| Scenario | Instances | Total RAM | Total Disk | Build Time |
+|----------|-----------|-----------|------------|------------|
+| Single instance (shared cache) | 1 | ~12GB | ~80GB | 4 hours |
+| Two instances (shared cache - **default**) | 2 | ~24GB | ~100GB | 6-8 hours |
+| Two instances (separate cache) | 2 | ~24GB | ~160GB | 8-10 hours |
+
+**Note:** 
+- Shared cache (default) saves ~60GB disk space for two instances
+- Build times increase due to resource contention when running multiple instances
+- First build downloads everything, subsequent builds are much faster due to shared cache
+
+---
+
+# 🎉 9. You're Ready!
 
 You now have a **full Yocto build environment** on macOS using Docker.
 

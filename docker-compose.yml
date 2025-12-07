@@ -15,7 +15,19 @@ services:
       - SSTATE_DIR=/sstate
     volumes:
       - ./workspace:/workspace
-      - ./sstate:/sstate
-      - ./downloads:/downloads
+      # Cache directories: Use shared caches if YOCTO_SHARED_SSTATE_DIR/YOCTO_SHARED_DOWNLOADS_DIR env vars are set
+      # Otherwise, use local per-instance caches (default behavior)
+      - ${YOCTO_SHARED_SSTATE_DIR:-./sstate}:/sstate
+      - ${YOCTO_SHARED_DOWNLOADS_DIR:-./downloads}:/downloads
+    # Resource limits: Uncomment and adjust values to limit resource usage
+    # Useful when running multiple instances simultaneously
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4'
+    #       memory: 8G
+    #     reservations:
+    #       cpus: '2'
+    #       memory: 4G
     command: bash -lc "bash"
 
