@@ -413,8 +413,8 @@ This repository is **pre-configured for multiple instances** with shared cache d
 **Shared caches are enabled by default** via the included `.env` file:
 
 ```bash
-YOCTO_SHARED_SSTATE_DIR=~/yocto-shared/sstate
-YOCTO_SHARED_DOWNLOADS_DIR=~/yocto-shared/downloads
+YOCTO_SHARED_SSTATE_DIR=${HOME}/yocto-shared/sstate
+YOCTO_SHARED_DOWNLOADS_DIR=${HOME}/yocto-shared/downloads
 ```
 
 ### **Benefits:**
@@ -465,8 +465,8 @@ The instance will fall back to local `./sstate` and `./downloads` directories.
 Edit `.env` and comment out or remove the shared cache variables:
 
 ```bash
-# YOCTO_SHARED_SSTATE_DIR=~/yocto-shared/sstate
-# YOCTO_SHARED_DOWNLOADS_DIR=~/yocto-shared/downloads
+# YOCTO_SHARED_SSTATE_DIR=${HOME}/yocto-shared/sstate
+# YOCTO_SHARED_DOWNLOADS_DIR=${HOME}/yocto-shared/downloads
 ```
 
 The instance will use local per-instance caches.
