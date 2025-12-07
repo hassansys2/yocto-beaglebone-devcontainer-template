@@ -295,7 +295,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: emb-linux:22.04
-    platform: linux/arm64
     tty: true
     stdin_open: true
     working_dir: /workspace

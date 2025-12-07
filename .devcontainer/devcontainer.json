@@ -1,0 +1,29 @@
+{
+  "name": "Yocto (BBB) — Dev Container",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "yocto",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "dev",
+  "overrideCommand": false,
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.exclude": {
+          "**/build": true,
+          "**/tmp": true
+        },
+        "editor.tabSize": 2
+      },
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens",
+        "github.vscode-pull-request-github"
+      ]
+    }
+  },
+  "postCreateCommand": "bash -lc 'git config --global --add safe.directory /workspace && sudo chown -R dev:dev /workspace /sstate /downloads || true && echo \"Devcontainer ready!\"'"
+}
+

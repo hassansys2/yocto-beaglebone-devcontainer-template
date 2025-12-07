@@ -1,0 +1,25 @@
+# Yocto build artifacts
+workspace/build-*/
+workspace/poky/
+workspace/meta-*/
+workspace/*.log
+
+# Cache directories (keep structure, ignore contents)
+sstate/*
+!sstate/.gitkeep
+downloads/*
+!downloads/.gitkeep
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*~
+

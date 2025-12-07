@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  yocto:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: emb-linux:22.04
+    tty: true
+    stdin_open: true
+    working_dir: /workspace
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+      - CCACHE_DIR=/home/dev/.ccache
+      - DL_DIR=/downloads
+      - SSTATE_DIR=/sstate
+    volumes:
+      - ./workspace:/workspace
+      - ./sstate:/sstate
+      - ./downloads:/downloads
+    command: bash -lc "bash"
+
